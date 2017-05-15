@@ -145,6 +145,8 @@ SCENARIO("An arbitrarily long integer in string form can be validated as prime o
                 REQUIRE(validator.isPrime("65537"));
                 REQUIRE(validator.isPrime("982451653"));
                 REQUIRE(validator.isPrime("4257452468389"));
+                REQUIRE(validator.isPrime("12764787846358441471"));
+//                REQUIRE(validator.isPrime("71755440315342536873"));
             }
         }
 
@@ -161,7 +163,10 @@ SCENARIO("An arbitrarily long integer in string form can be validated as prime o
                 REQUIRE(!validator.isPrime("35"));
                 REQUIRE(!validator.isPrime("49"));
                 REQUIRE(!validator.isPrime("34585"));
-                REQUIRE(!validator.isPrime("982451653) * InfInt(4257452468389"));
+                REQUIRE(!validator.isPrime("33333333333333333333333333333"));
+                REQUIRE(!validator.isPrime("27346726347862387628734678235"));
+                // Long running test
+//                REQUIRE(!validator.isPrime("4182741215137703297017")); // 982451653 * 4257452468389
             }
         }
     }

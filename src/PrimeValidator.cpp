@@ -39,7 +39,7 @@ bool PrimeValidator::isPrime(unsigned long long n)
     return true;
 }
 
-bool PrimeValidator::isPrime(InfInt n)
+bool PrimeValidator::isPrime(const InfInt &n)
 {
     if (n <= ULLONG_MAX)
     {
@@ -52,9 +52,15 @@ bool PrimeValidator::isPrime(InfInt n)
     }
 
     InfInt end = n.intSqrt();
+    InfInt printVal(1000);
 
     for (InfInt i = 3; i <= end; i += 2)
     {
+        if (i >= printVal)
+        {
+            cerr << "Testing " << n << " % " << i << endl;
+            printVal *= 10;
+        }
         if (n % i == 0)
         {
             return false;
@@ -66,7 +72,17 @@ bool PrimeValidator::isPrime(InfInt n)
 
 bool PrimeValidator::isPrime(const string &s)
 {
-    char last = s[s.length()];
+    if (s == "2" || s == "3" || s == "5")
+    {
+        return true;
+    }
+
+    if (s.empty() || s == "0" || s == "1")
+    {
+        return false;
+    }
+
+    short last = s[s.length() - 1] - '0';
 
     // Some easy checks for non-prime
     // * Even numbers
@@ -76,11 +92,11 @@ bool PrimeValidator::isPrime(const string &s)
         return false;
     }
 
-    // Check for divisibility by 3
-    long long sum = last;
-    for (long long i = s.length() - 2; i >= 0; --i)
+    // Check for divisibility by 3 (if sum of digits is divisible by 3)
+    long sum = last;
+    for (long i = s.length() - 2; i >= 0; --i)
     {
-        sum += s[i];
+        sum += s[i] - '0';
     }
     if (sum % 3 == 0)
     {
@@ -99,7 +115,7 @@ bool PrimeValidator::isPrime(const string &s)
         }
         catch (const InfIntException &e)
         {
-
+            return isPrime(n);
         }
     }
     catch (const InfIntException &e)

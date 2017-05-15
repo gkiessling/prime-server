@@ -18,7 +18,7 @@ class PrimeValidator
 {
 public:
     bool isPrime(unsigned long long n);
-    bool isPrime(InfInt n);
+    bool isPrime(const InfInt &n);
     bool isPrime(const string &s);
     bool isPrime(const char *s) { return isPrime(string(s)); }
 };

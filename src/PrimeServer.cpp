@@ -7,101 +7,112 @@
 
 #include <iostream>
 #include <sstream>
-#include <vector>
+#include <thread>
 
-#include <sys/socket.h>
-#include <arpa/inet.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+
+#include "PrimeServer.h"
+#include "PrimeValidator.h"
 
 using namespace std;
 
-static const string responseHeader = "HTTP/1.1 200 OK\r\n"
-    "Content-Type: application/json; charset=utf-8\r\n"
-    "Connection: close\r\n"
-    "Content-Length: ";
-
-class PrimeServer
+static void processConnection(int clientFd)
 {
-public:
-    int start()
+    int readSize;
+    char buffer[2000];
+    stringstream clientStream;
+    PrimeValidator primeValidator;
+
+    cout << "Connection accepted" << endl;
+
+    while ( (readSize = recv(clientFd, buffer, sizeof(buffer), 0)) > 0 )
     {
-        int socketFd;
-        int clientFd;
-        int socketLen = sizeof(struct sockaddr_in);
-        int readSize;
-        struct sockaddr_in server , client;
-        char clientMessage[2000];
-
-        socketFd = socket(AF_INET , SOCK_STREAM , 0);
-        if (socketFd == -1)
+        // Newline marks the end of the message
+        if (buffer[readSize - 1] == '\n')
         {
-            cerr << "Could not create socket" << endl;
-            return -1;
+            clientStream.write(buffer, readSize - 1);
+            readSize = 0;
+            break;
         }
-        cout << "Socket created" << endl;
-
-        server.sin_family = AF_INET;
-        server.sin_addr.s_addr = INADDR_ANY;
-        server.sin_port = htons(8080);
-
-        if (::bind(socketFd, (struct sockaddr *)&server , sizeof(server)) < 0)
+        else
         {
-            perror("Bind failed");
-            return -1;
+            clientStream.write(buffer, readSize);
         }
-        cout << "Bind complete" << endl;
+    }
 
-        ::listen(socketFd , 3);
+    string clientMessage(clientStream.str());
+    cout << "Client request: " << clientMessage << endl;
 
-        cout << "Waiting for incoming connections..." << endl;
+    string reply(primeValidator.isPrime(clientMessage) ? "true\n" : "false\n");
 
-        clientFd = ::accept(socketFd, (struct sockaddr *)&client, (socklen_t*)&socketLen);
+    ::write(clientFd , reply.c_str(), reply.length());
+    ::shutdown(clientFd, SHUT_WR);
+
+    if (readSize == 0)
+    {
+        cout << "Client disconnected" << endl;
+    }
+    else if(readSize == -1)
+    {
+        perror("Receive failed");
+    }
+}
+
+PrimeServer::PrimeServer(unsigned short serverPort)
+: serverPort(serverPort)
+{
+}
+
+int PrimeServer::start()
+{
+    int socketFd;
+    int clientFd;
+    int socketLen = sizeof(struct sockaddr_in);
+    struct sockaddr_in serverAddress, clientAddress;
+
+    socketFd = socket(AF_INET, SOCK_STREAM, 0);
+    if (socketFd == -1)
+    {
+        cerr << "Could not create socket" << endl;
+        return -1;
+    }
+    cout << "Socket created" << endl;
+
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_addr.s_addr = INADDR_ANY;
+    serverAddress.sin_port = htons(serverPort);
+
+    if (::bind(socketFd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
+    {
+        perror("Bind failed");
+        return -1;
+    }
+    cout << "Bind complete" << endl;
+
+    ::listen(socketFd , 3);
+
+    cout << "Waiting for incoming connections on port " << serverPort << endl;
+
+    while ( (clientFd = ::accept(socketFd, (struct sockaddr *)&clientAddress, (socklen_t*)&socketLen)) )
+    {
         if (clientFd < 0)
         {
             perror("Accept failed");
-            return -1;
-        }
-        cout << "Connection accepted" << endl;
-
-        //Receive a message from client
-        while ( (readSize = recv(clientFd, clientMessage, sizeof(clientMessage), 0)) > 0 )
-        {
-            //Send the message back to client
-            cout << "Request:" << endl << clientMessage << endl;
-            std::string message(makeResponse("{ \"result\" : 12345 }"));
-            ::write(clientFd , message.c_str(), message.length());
-            cout << "Response:" << endl << message << endl;
+            continue;
         }
 
-        if (readSize == 0)
-        {
-            cout << "Client disconnected" << endl;
-        }
-        else if(readSize == -1)
-        {
-            perror("Receive failed");
-        }
-
-        return 0;
+        // Better to use a thread pool, or even better, asynchronous IO.
+        // But having one client thread per connection will suffice for this project.
+        thread(processConnection, clientFd).detach();
     }
 
-private:
+    return 0;
+}
 
-    string makeResponse(string message)
-    {
-        stringstream result;
-        result << responseHeader
-                << (message.length())
-                << "\r\n\r\n" << message;
-        return result.str();
-    }
-};
-
-int main(int argc, char *argv[])
+void PrimeServer::addAuxServer(const string &ipAddress, unsigned short port)
 {
-    cout << "PrimeServer starting..." << endl;
-
-    PrimeServer server;
-    server.start();
+    auxServers.push_back(PrimeClient(ipAddress, port));
 }
 
